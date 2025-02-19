@@ -83,7 +83,7 @@ def clip_ddim_diffusion(x, seq, model, b, cls_fn=None, rho_scale=1.0, prompt=Non
     # return x0_preds, xs
     return [xs[-1]], [x0_preds[-1]]
 
-
+#主要
 def parse_ddim_diffusion(x, seq, model, b, cls_fn=None, rho_scale=1.0, stop=100, ref_path=None):
     parser = FaceParseTool(ref_path=ref_path).cuda()
 

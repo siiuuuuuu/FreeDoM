@@ -207,10 +207,10 @@ class Diffusion(object):
         if last:
             x = x[0][-1]
         return x
-    
+    #需要看的
     def sample_image_alogrithm_parse_ddim(self, x, model, last=True, cls_fn=None, rho_scale=1.0, stop=100, ref_path=None):
         skip = self.num_timesteps // self.args.timesteps
-        seq = range(0, self.num_timesteps, skip)
+        seq = range(0, self.num_timesteps, skip)#DDIM跳步序列
         
         x.requires_grad = True
         
