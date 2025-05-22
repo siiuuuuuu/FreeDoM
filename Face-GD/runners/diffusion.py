@@ -195,15 +195,34 @@ class Diffusion(object):
                     tvu.save_image(
                         x[i][j], os.path.join(self.args.image_folder, f"{index + j}_{i}.png")
                     )
-    
     def sample_image_alogrithm_clip_ddim(self, x, model, last=True, cls_fn=None, rho_scale=1.0, prompt=None, stop=100, domain="face"):
+        """
+        使用 CLIP 引导的 DDIM 算法进行图像采样。
+        
+        参数:
+        x (torch.Tensor): 输入的噪声图像张量。
+        model (torch.nn.Module): 用于生成图像的模型。
+        last (bool, 可选): 是否只返回最后一个时间步的图像。默认为 True。
+        cls_fn (callable, 可选): 分类器函数。默认为 None。
+        rho_scale (float, 可选): 引导强度的缩放因子。默认为 1.0。
+        prompt (str, 可选): 文本提示，用于引导图像生成。默认为 None。
+        stop (int, 可选): 停止采样的时间步。默认为 100。
+        domain (str, 可选): 图像生成的领域，如 "face" 或 "imagenet"。默认为 "face"。
+        
+        返回:
+        torch.Tensor: 生成的图像张量。
+        """
+        # 计算跳步间隔，用于控制采样的时间步数
         skip = self.num_timesteps // self.args.timesteps
+        # 生成 DDIM 跳步序列
         seq = range(0, self.num_timesteps, skip)
         
+        # 开启输入张量的梯度计算
         x.requires_grad = True
         
+        # 调用 clip_ddim_diffusion 函数进行图像采样
         x = clip_ddim_diffusion(x, seq, model, self.betas, cls_fn=cls_fn, rho_scale=rho_scale, prompt=prompt, stop=stop, domain=domain)
-
+        # 如果 last 为 True，则只返回最后一个时间步的图像
         if last:
             x = x[0][-1]
         return x

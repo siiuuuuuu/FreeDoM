@@ -232,7 +232,7 @@ class BiSeNet(nn.Module):
         self.cp = ContextPath()
         ## here self.sp is deleted
         self.ffm = FeatureFusionModule(256, 256)
-        self.conv_out = BiSeNetOutput(256, 256, n_classes)
+        self.conv_out = BiSeNetOutput(256, 256, n_classes)#输出为[1, 19, H, W]
         self.conv_out16 = BiSeNetOutput(128, 64, n_classes)
         self.conv_out32 = BiSeNetOutput(128, 64, n_classes)
         self.init_weight()
@@ -270,7 +270,7 @@ class BiSeNet(nn.Module):
                 nowd_params += child_nowd_params
         return wd_params, nowd_params, lr_mul_wd_params, lr_mul_nowd_params
     
-
+#将作为条件的参考图片与采样过程的图片做MSE得到能量函数梯度
 class FaceParseTool(nn.Module):
     def __init__(self, n_classes=19, ref_path=None):
         super(FaceParseTool, self).__init__()
@@ -299,16 +299,16 @@ class FaceParseTool(nn.Module):
             (0.485*2-1, 0.456*2-1, 0.406*2-1), 
             (0.229*2, 0.224*2, 0.225*2)
         )
-        
+        #将采样过程的图片与参考图片做欧式距离
     def get_residual(self, image):
-        image = torch.nn.functional.interpolate(image, size=512, mode='bicubic')
+        image = torch.nn.functional.interpolate(image, size=512, mode='bicubic')#线性插值成512*512好算距离
         image = self.preprocess(image)
         
         ref_mask = self.net(self.ref)[0]
         img_mask = self.net(image)[0]
-        
+        #都经过bisenet映射
         return ref_mask - img_mask
-    
+    #image_y为标签图片
     def get_residual_y(self, image, image_y):
         image = torch.nn.functional.interpolate(image, size=512, mode='bicubic')
         image = self.preprocess(image)
@@ -320,12 +320,15 @@ class FaceParseTool(nn.Module):
         img_mask = self.net(image)[0]
         
         return ref_mask - img_mask
-    
+    #分割出特定特征作为条件，即只有这些条件会引导梯度更新，例如对一副人脸，对应发生变化的部位是mask掉的在生成的时候
+    #即mask的特征并不会引导生成，存粹让模型自己的多样性发挥作用
+    #这个函数得自己调用在denoising.py中parser这个类
     def get_mask(self, image, id_num):
         image = torch.nn.functional.interpolate(image, size=512, mode='bicubic')
         image = self.preprocess(image)
-        img_mask = self.net(image)[0]
-        img_mask = img_mask.squeeze(0).cpu().detach().numpy().argmax(0)
+        img_mask = self.net(image)[0]#[0]为主输出，形状为[1, 19, H, W]
+        img_mask = img_mask.squeeze(0).cpu().detach().numpy().argmax(0)#变成[19, H, W]对19个通道的图片取最大索引
+        #后在取每个像素的最大概率的类别的索引，变成[H, W]每个位置的元素为其类别的索引
         img_mask = torch.Tensor(img_mask)
         if type(id_num) == list:
             img_res = (img_mask == id_num[0]) * 1
@@ -333,7 +336,7 @@ class FaceParseTool(nn.Module):
                 img_res += (img_mask == id_num[i]) * 1
             img_mask = img_res
         else:
-            img_mask = (img_mask == id_num) * 1
+            img_mask = (img_mask == id_num) * 1#会把是id_num的类别的像素置为1，其他为0
         img_mask = img_mask.reshape(1, 1, 512, 512).float()
         img_mask = torch.nn.functional.interpolate(img_mask, size=256, mode='bicubic')
         return img_mask.cuda().detach()
